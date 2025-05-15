@@ -1,4 +1,4 @@
-import pool from '../db.js';
+import repo from '../repositories/pedidosRepository.js';
 
 // POST /orders
 export const createOrder = async (req, res) => {
@@ -9,13 +9,13 @@ export const createOrder = async (req, res) => {
   }
 
   try {
-    const result = await pool.query(
-      `INSERT INTO pedidos (id_cliente, id_restaurante, id_reserva, fecha, estado)
-       VALUES ($1, $2, $3, NOW(), 'pendiente') RETURNING *`,
-      [id_cliente, id_restaurante, id_reserva || null]
-    );
+    const nuevo = await repo.create({
+      id_cliente,
+      id_restaurante,
+      id_reserva: id_reserva || null
+    });
 
-    res.status(201).json({ message: "Pedido creado exitosamente.", data: result.rows[0] });
+    res.status(201).json({ message: "Pedido creado exitosamente.", data: nuevo });
   } catch (error) {
     res.status(500).json({ message: "Error al crear el pedido.", error: error.message });
   }
@@ -26,13 +26,13 @@ export const getOrderById = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await pool.query('SELECT * FROM pedidos WHERE id = $1', [id]);
+    const pedido = await repo.getById(id);
 
-    if (result.rows.length === 0) {
+    if (!pedido) {
       return res.status(404).json({ message: "Pedido no encontrado." });
     }
 
-    res.status(200).json({ data: result.rows[0] });
+    res.status(200).json({ data: pedido });
   } catch (error) {
     res.status(500).json({ message: "Error al obtener el pedido.", error: error.message });
   }
@@ -43,8 +43,8 @@ export const getOrdersByUser = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await pool.query('SELECT * FROM pedidos WHERE id_cliente = $1', [id]);
-    res.status(200).json({ data: result.rows });
+    const pedidos = await repo.getByClienteId(id);
+    res.status(200).json({ data: pedidos });
   } catch (error) {
     res.status(500).json({ message: "Error al obtener pedidos del usuario.", error: error.message });
   }
@@ -55,8 +55,8 @@ export const getOrdersByRestaurant = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await pool.query('SELECT * FROM pedidos WHERE id_restaurante = $1', [id]);
-    res.status(200).json({ data: result.rows });
+    const pedidos = await repo.getByRestauranteId(id);
+    res.status(200).json({ data: pedidos });
   } catch (error) {
     res.status(500).json({ message: "Error al obtener pedidos del restaurante.", error: error.message });
   }
@@ -73,17 +73,14 @@ export const updateOrderStatus = async (req, res) => {
   }
 
   try {
-    const check = await pool.query('SELECT * FROM pedidos WHERE id = $1', [id]);
-    if (check.rows.length === 0) {
+    const pedido = await repo.getById(id);
+    if (!pedido) {
       return res.status(404).json({ message: "Pedido no encontrado." });
     }
 
-    const result = await pool.query(
-      'UPDATE pedidos SET estado = $1 WHERE id = $2 RETURNING *',
-      [estado, id]
-    );
+    const actualizado = await repo.updateEstado(id, estado);
 
-    res.status(200).json({ message: "Estado actualizado.", data: result.rows[0] });
+    res.status(200).json({ message: "Estado actualizado.", data: actualizado });
   } catch (error) {
     res.status(500).json({ message: "Error al actualizar el pedido.", error: error.message });
   }
@@ -94,12 +91,12 @@ export const deleteOrder = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const check = await pool.query('SELECT * FROM pedidos WHERE id = $1', [id]);
-    if (check.rows.length === 0) {
+    const pedido = await repo.getById(id);
+    if (!pedido) {
       return res.status(404).json({ message: "Pedido no encontrado." });
     }
 
-    await pool.query('DELETE FROM pedidos WHERE id = $1', [id]);
+    await repo.remove(id);
     res.status(200).json({ message: "Pedido eliminado con éxito." });
   } catch (error) {
     res.status(500).json({ message: "Error al eliminar el pedido.", error: error.message });
