@@ -2,7 +2,13 @@ version: "3.8"
 
 volumes:
   pgdata:
-
+  mongodata1:
+  mongodata2:
+  mongodata3:
+  config1:
+  config2:
+  config3:
+  
 networks:
   restaurant_net:
     driver: bridge
