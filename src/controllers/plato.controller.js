@@ -1,32 +1,29 @@
-import pool from '../db.js';
+import repo from '../repositories/platosRepository.js';
 import redisClient from '../config/redis.js';
 
 // POST /menus/:id/platos
 export const crearPlato = async (req, res) => {
   const { id } = req.params;
-  const { nombre, precio } = req.body;
+  const { nombre, precio, descripcion, categoria, disponible } = req.body;
 
   if (!nombre || !precio) {
     return res.status(400).json({ status: "error", message: "Faltan datos del plato." });
   }
 
   try {
-    const menuCheck = await pool.query('SELECT * FROM menus WHERE id = $1', [id]);
-    if (menuCheck.rows.length === 0) {
-      return res.status(404).json({ status: "error", message: "Menú no encontrado" });
-    }
-
-    const result = await pool.query(
-      `INSERT INTO platos (nombre, precio, id_menu)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      [nombre, precio, id]
-    );
+    const nuevo = await repo.create({
+      nombre,
+      precio,
+      descripcion,
+      categoria,
+      disponible,
+      id_menu: id
+    });
 
     res.status(201).json({
       status: "success",
       message: "Plato creado exitosamente",
-      data: result.rows[0]
+      data: nuevo
     });
   } catch (error) {
     res.status(500).json({
@@ -43,7 +40,6 @@ export const getPlatoId = async (req, res) => {
   const cacheKey = `plato:${id}`;
 
   try {
-    // 1. Buscar en caché
     const cached = await redisClient.get(cacheKey);
     if (cached) {
       return res.status(200).json({
@@ -53,23 +49,20 @@ export const getPlatoId = async (req, res) => {
       });
     }
 
-    // 2. Consultar base de datos
-    const result = await pool.query('SELECT * FROM platos WHERE id = $1', [id]);
-
-    if (result.rows.length === 0) {
+    const plato = await repo.getById(id);
+    if (!plato) {
       return res.status(404).json({
         status: "error",
         message: "Plato no encontrado"
       });
     }
 
-    // 3. Guardar en caché por 5 minutos
-    await redisClient.setEx(cacheKey, 300, JSON.stringify(result.rows[0]));
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(plato));
 
     res.status(200).json({
       status: "success",
       message: "Plato obtenido desde base de datos",
-      data: result.rows[0]
+      data: plato
     });
   } catch (error) {
     res.status(500).json({
@@ -80,30 +73,32 @@ export const getPlatoId = async (req, res) => {
   }
 };
 
-
 // PUT /platos/:id
 export const actualizarPlato = async (req, res) => {
   const { id } = req.params;
-  const { nombre, precio } = req.body;
+  const { nombre, precio, descripcion, categoria, disponible } = req.body;
 
   try {
-    const check = await pool.query('SELECT * FROM platos WHERE id = $1', [id]);
-    if (check.rows.length === 0) {
+    const existente = await repo.getById(id);
+    if (!existente) {
       return res.status(404).json({
         status: "error",
         message: "Plato no encontrado"
       });
     }
 
-    const result = await pool.query(
-      'UPDATE platos SET nombre = $1, precio = $2 WHERE id = $3 RETURNING *',
-      [nombre, precio, id]
-    );
+    const actualizado = await repo.update(id, {
+      nombre,
+      precio,
+      descripcion,
+      categoria,
+      disponible
+    });
 
     res.status(200).json({
       status: "success",
       message: "Plato actualizado exitosamente",
-      data: result.rows[0]
+      data: actualizado
     });
   } catch (error) {
     res.status(500).json({
@@ -119,15 +114,15 @@ export const eliminarPlato = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const check = await pool.query('SELECT * FROM platos WHERE id = $1', [id]);
-    if (check.rows.length === 0) {
+    const existente = await repo.getById(id);
+    if (!existente) {
       return res.status(404).json({
         status: "error",
         message: "Plato no encontrado"
       });
     }
 
-    await pool.query('DELETE FROM platos WHERE id = $1', [id]);
+    await repo.remove(id);
 
     res.status(200).json({
       status: "success",
@@ -148,35 +143,30 @@ export const getPlatosByMenu = async (req, res) => {
   const cacheKey = `platos_menu:${id}`;
 
   try {
-    // 1. Revisar caché
-    const cachedPlatos = await redisClient.get(cacheKey);
-    if (cachedPlatos) {
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
       return res.status(200).json({
         status: "success",
         message: "Platos obtenidos desde caché",
-        data: JSON.parse(cachedPlatos)
+        data: JSON.parse(cached)
       });
     }
 
-    // 2. Validar menú
-    const menuCheck = await pool.query('SELECT * FROM menus WHERE id = $1', [id]);
-    if (menuCheck.rows.length === 0) {
+    const platos = await repo.getByMenuId(id);
+
+    if (!platos || platos.length === 0) {
       return res.status(404).json({
         status: "error",
-        message: "Menú no encontrado"
+        message: "No se encontraron platos para este menú"
       });
     }
 
-    // 3. Obtener platos de la base de datos
-    const result = await pool.query('SELECT * FROM platos WHERE id_menu = $1', [id]);
-
-    // 4. Guardar en caché por 2 minutos
-    await redisClient.setEx(cacheKey, 120, JSON.stringify(result.rows));
+    await redisClient.setEx(cacheKey, 120, JSON.stringify(platos));
 
     res.status(200).json({
       status: "success",
       message: "Platos obtenidos desde base de datos",
-      data: result.rows
+      data: platos
     });
   } catch (error) {
     res.status(500).json({
@@ -186,4 +176,3 @@ export const getPlatosByMenu = async (req, res) => {
     });
   }
 };
-
