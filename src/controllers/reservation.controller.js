@@ -1,4 +1,4 @@
-import pool from '../db.js';
+import repo from '../repositories/reservasRepository.js';
 
 // POST /reservations
 export const createReservation = async (req, res) => {
@@ -9,14 +9,14 @@ export const createReservation = async (req, res) => {
   }
 
   try {
-    const result = await pool.query(
-      `INSERT INTO reservas (id_cliente, id_restaurante, fecha, numero_personas, estado)
-       VALUES ($1, $2, $3, $4, 'pendiente')
-       RETURNING *`,
-      [id_cliente, id_restaurante, fecha, numero_personas]
-    );
+    const nueva = await repo.create({
+      id_cliente,
+      id_restaurante,
+      fecha,
+      numero_personas
+    });
 
-    res.status(201).json({ message: "Reserva creada con éxito.", data: result.rows[0] });
+    res.status(201).json({ message: "Reserva creada con éxito.", data: nueva });
   } catch (error) {
     res.status(500).json({ message: "Error al crear la reserva.", error: error.message });
   }
@@ -27,35 +27,30 @@ export const getReservationById = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await pool.query('SELECT * FROM reservas WHERE id = $1', [id]);
+    const reserva = await repo.getById(id);
 
-    if (result.rows.length === 0) {
+    if (!reserva) {
       return res.status(404).json({ message: "Reserva no encontrada." });
     }
 
-    res.status(200).json({ data: result.rows[0] });
+    res.status(200).json({ data: reserva });
   } catch (error) {
     res.status(500).json({ message: "Error al obtener la reserva.", error: error.message });
   }
 };
 
-// DELETE /reservations/:id (cancelar reserva)
+// DELETE /reservations/:id (cancelar)
 export const cancelReservation = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const check = await pool.query('SELECT * FROM reservas WHERE id = $1', [id]);
+    const actualizada = await repo.cancel(id);
 
-    if (check.rows.length === 0) {
+    if (!actualizada) {
       return res.status(404).json({ message: "Reserva no encontrada." });
     }
 
-    const result = await pool.query(
-      'UPDATE reservas SET estado = $1 WHERE id = $2 RETURNING *',
-      ['cancelada', id]
-    );
-
-    res.status(200).json({ message: "Reserva cancelada con éxito.", data: result.rows[0] });
+    res.status(200).json({ message: "Reserva cancelada con éxito.", data: actualizada });
   } catch (error) {
     res.status(500).json({ message: "Error al cancelar la reserva.", error: error.message });
   }
@@ -66,12 +61,8 @@ export const getReservationsByUser = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await pool.query(
-      'SELECT * FROM reservas WHERE id_cliente = $1',
-      [id]
-    );
-
-    res.status(200).json({ data: result.rows });
+    const reservas = await repo.getByClienteId(id);
+    res.status(200).json({ data: reservas });
   } catch (error) {
     res.status(500).json({ message: "Error al obtener reservas del usuario.", error: error.message });
   }
@@ -82,12 +73,8 @@ export const getReservationsByRestaurant = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await pool.query(
-      'SELECT * FROM reservas WHERE id_restaurante = $1',
-      [id]
-    );
-
-    res.status(200).json({ data: result.rows });
+    const reservas = await repo.getByRestauranteId(id);
+    res.status(200).json({ data: reservas });
   } catch (error) {
     res.status(500).json({ message: "Error al obtener reservas del restaurante.", error: error.message });
   }
