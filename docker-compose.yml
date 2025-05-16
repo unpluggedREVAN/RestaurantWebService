@@ -52,6 +52,8 @@ services:
       - DB_PASSWORD=admin2525
       - DB_DATABASE=restaurante
       - DB_PORT=5432
+      - MONGO_URI=mongodb://mongos:27017/restaurante
+      - DB_ENGINE=mongodb
       - PORT=3000
     networks:
       - restaurant_net
@@ -71,6 +73,8 @@ services:
       - DB_PASSWORD=admin2525
       - DB_DATABASE=restaurante
       - DB_PORT=5432
+      - MONGO_URI=mongodb://mongos:27017/restaurante
+      - DB_ENGINE=mongodb
       - PORT=3000
     networks:
       - restaurant_net

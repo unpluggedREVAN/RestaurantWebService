@@ -5,6 +5,7 @@ import swaggerJSDoc from 'swagger-jsdoc';
 import swaggerUI from 'swagger-ui-express';
 
 import { PORT } from './config.js';
+import connectMongo from './config/mongo.js';
 
 // Rutas de negocio
 import userRoutes from './routes/user.routes.js';
@@ -82,8 +83,19 @@ export default app;
 
 // inicia
 if (process.env.NODE_ENV !== 'test') {
-  console.log("Instancia activa en puerto:", PORT); // temporal, logs de control
-  app.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
-  });
+  const startServer = async () => {
+    try {
+      await connectMongo();
+      console.log("MongoDB conectado");
+      console.log("Instancia activa en puerto:", PORT);
+      app.listen(PORT, () => {
+        console.log(`Servidor corriendo en http://localhost:${PORT}`);
+      });
+    } catch (error) {
+      console.error("No se pudo iniciar el servidor:", error.message);
+      process.exit(1);
+    }
+  };
+
+  startServer();
 }

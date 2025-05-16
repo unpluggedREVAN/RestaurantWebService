@@ -165,23 +165,3 @@ export const eliminarRestaurante = async (req, res) => {
     });
   }
 };
-
-// GET /restaurants/:id/reservations
-export const getReservationsByRestaurant = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const reservas = await repo.getReservationsByRestaurant(id);
-    res.status(200).json({
-      status: 'success',
-      message: 'Reservas del restaurante obtenidas exitosamente',
-      data: reservas
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: 'Error al obtener reservas del restaurante',
-      error: error.message
-    });
-  }
-};
