@@ -15,6 +15,7 @@ networks:
 
 services:
   db:
+    container_name: postgresdb
     image: postgres:15-alpine
     restart: always
     environment:
@@ -30,6 +31,7 @@ services:
       - restaurant_net
 
   redis:
+    container_name: redis
     image: redis:7-alpine
     ports:
       - "6379:6379"
@@ -38,6 +40,7 @@ services:
       - restaurant_net
 
   app1:
+    container_name: app1
     build:
       context: .
       dockerfile: Dockerfile
@@ -57,6 +60,7 @@ services:
       - restaurant_net
 
   app2:
+    container_name: app2
     build:
       context: .
       dockerfile: Dockerfile
@@ -76,6 +80,7 @@ services:
       - restaurant_net
 
   nginx:
+    container_name: nginx
     image: nginx:latest
     ports:
       - "3000:80"
