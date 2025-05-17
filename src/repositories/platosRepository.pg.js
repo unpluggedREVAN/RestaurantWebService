@@ -1,11 +1,11 @@
 import pool from '../db.js';
 
-const create = async ({ nombre, precio, descripcion, categoria, disponible, id_menu }) => {
+const create = async ({ nombre, precio, descripcion = 'Producto sin descripción', categoria = 'Sin categoría', disponible = true, id_menu }) => {
   const result = await pool.query(
-    `INSERT INTO platos (nombre, precio, id_menu)
-     VALUES ($1, $2, $3)
+    `INSERT INTO platos (nombre, precio, descripcion, categoria, disponible, id_menu)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [nombre, precio, id_menu]
+    [nombre, precio, descripcion, categoria, disponible, id_menu]
   );
   return result.rows[0];
 };
@@ -22,8 +22,11 @@ const getByMenuId = async (id_menu) => {
 
 const update = async (id, { nombre, precio, descripcion, categoria, disponible }) => {
   const result = await pool.query(
-    'UPDATE platos SET nombre = $1, precio = $2 WHERE id = $3 RETURNING *',
-    [nombre, precio, id]
+    `UPDATE platos
+     SET nombre = $1, precio = $2, descripcion = $3, categoria = $4, disponible = $5
+     WHERE id = $6
+     RETURNING *`,
+    [nombre, precio, descripcion, categoria, disponible, id]
   );
   return result.rows[0] || null;
 };
