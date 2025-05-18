@@ -8,9 +8,7 @@ volumes:
   config1:
   config2:
   config3:
-  es-data-es01:
-  es-data-es02:
-  es-data-es03:
+  esdata:
   
 networks:
   restaurant_net:
@@ -225,6 +223,17 @@ services:
     networks:
       - restaurant_net
 
+  search:
+    build:
+      context: ./src/search-service
+    ports:
+      - "4000:4000"
+    depends_on:
+      - elasticsearch
+      - app1
+    networks:
+      - restaurant_net
+
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.10.2
     container_name: elasticsearch
@@ -249,6 +258,3 @@ services:
       - elasticsearch
     networks:
       - restaurant_net
-
-  volumes:
-    esdata:

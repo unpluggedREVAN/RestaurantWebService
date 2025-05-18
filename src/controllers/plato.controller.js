@@ -176,3 +176,22 @@ export const getPlatosByMenu = async (req, res) => {
     });
   }
 };
+
+// GET /platos
+export const getAllPlatos = async (req, res) => {
+  try {
+    const platos = await repo.getAll();
+
+    res.status(200).json({
+      status: "success",
+      message: "Lista de todos los platos",
+      data: platos
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: "Error al obtener todos los platos",
+      error: error.message
+    });
+  }
+};

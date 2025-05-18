@@ -16,6 +16,10 @@ const getById = async (id) => {
   return await Plato.findById(id).lean();
 };
 
+const getAll = async () => {
+  return await Plato.find().lean(); // Para Mongo
+};
+
 const getByMenuId = async (id_menu) => {
   return await Plato.find({ id_menu }).lean();
 };
@@ -32,6 +36,7 @@ export default {
   create,
   getById,
   getByMenuId,
+  getAll,
   update,
   remove
 };

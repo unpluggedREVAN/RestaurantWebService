@@ -15,6 +15,10 @@ const getById = async (id) => {
   return result.rows[0] || null;
 };
 
+const getAll = async () => {
+  return await pool.query('SELECT * FROM platos');
+};
+
 const getByMenuId = async (id_menu) => {
   const result = await pool.query('SELECT * FROM platos WHERE id_menu = $1', [id_menu]);
   return result.rows;
@@ -39,6 +43,7 @@ export default {
   create,
   getById,
   getByMenuId,
+  getAll,
   update,
   remove
 };
