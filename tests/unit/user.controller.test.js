@@ -1,4 +1,3 @@
-// tests/controllers/user.controller.test.js
 import { jest } from '@jest/globals';
 
 let repo;
