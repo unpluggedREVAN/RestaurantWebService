@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import {
-  getUsers,
-  getUser,
-  createUser,
-  updateUser,
-  deleteUser
+  getUsuarios,
+  getUsuarioById,
+  crearUsuario,
+  actualizarUsuario,
+  eliminarUsuario
 } from '../controllers/user.controller.js';
-import { getReservationsByUser } from '../controllers/user.controller.js';
-import { getReservationsByRestaurant } from '../controllers/restaurante.controller.js';
+//import { getReservationsByUser } from '../controllers/user.controller.js';
+//import { getReservationsByRestaurant } from '../controllers/restaurante.controller.js';
 
 const router = Router();
 
@@ -52,7 +52,7 @@ const router = Router();
  *              items:
  *                $ref: '#/components/schemas/User'
  */
-router.get('/users', getUsers);
+router.get('/users', getUsuarios);
 
 /**
  * @swagger
@@ -77,7 +77,7 @@ router.get('/users', getUsers);
  *      404:
  *        description: Usuario no encontrado
  */
-router.get('/users/:id', getUser);
+router.get('/users/:id', getUsuarioById);
 
 /**
  * @swagger
@@ -95,7 +95,7 @@ router.get('/users/:id', getUser);
  *      201:
  *        description: Usuario creado correctamente
  */
-router.post('/users', createUser);
+router.post('/users', crearUsuario);
 
 /**
  * @swagger
@@ -122,7 +122,7 @@ router.post('/users', createUser);
  *      404:
  *        description: Usuario no encontrado
  */
-router.put('/users/:id', updateUser);
+router.put('/users/:id', actualizarUsuario);
 
 /**
  * @swagger
@@ -143,8 +143,8 @@ router.put('/users/:id', updateUser);
  *      404:
  *        description: Usuario no encontrado
  */
-router.delete('/users/:id', deleteUser);
-router.get('/users/:id/reservations', getReservationsByUser); //Nuevo, se tiene que documentar
-router.get('/restaurants/:id/reservations', getReservationsByRestaurant);
+router.delete('/users/:id', eliminarUsuario);
+//router.get('/users/:id/reservations', getReservationsByUser); //Nuevo, se tiene que documentar
+//router.get('/restaurants/:id/reservations', getReservationsByRestaurant);
 
 export default router;

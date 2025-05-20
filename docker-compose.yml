@@ -1,0 +1,260 @@
+version: "3.8"
+
+volumes:
+  pgdata:
+  mongodata1:
+  mongodata2:
+  mongodata3:
+  config1:
+  config2:
+  config3:
+  esdata:
+  
+networks:
+  restaurant_net:
+    driver: bridge
+
+services:
+  db:
+    container_name: postgresdb
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: restaurante
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin2525
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - restaurant_net
+
+  redis:
+    container_name: redis
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: always
+    networks:
+      - restaurant_net
+
+  app1:
+    container_name: app1
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "3001:3000"
+    environment:
+      - DB_HOST=db
+      - DB_USER=postgres
+      - DB_PASSWORD=admin2525
+      - DB_DATABASE=restaurante
+      - DB_PORT=5432
+      - MONGO_URI=mongodb://mongos:27017/restaurante
+      - DB_ENGINE=mongodb
+      - PORT=3000
+    networks:
+      - restaurant_net
+
+  app2:
+    container_name: app2
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "3002:3000"
+    environment:
+      - DB_HOST=db
+      - DB_USER=postgres
+      - DB_PASSWORD=admin2525
+      - DB_DATABASE=restaurante
+      - DB_PORT=5432
+      - MONGO_URI=mongodb://mongos:27017/restaurante
+      - DB_ENGINE=mongodb
+      - PORT=3000
+    networks:
+      - restaurant_net
+
+  nginx:
+    container_name: nginx
+    image: nginx:latest
+    ports:
+      - "3000:80"
+    volumes:
+      - ./src/config/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app1
+      - app2
+    networks:
+      - restaurant_net
+
+#-----MONGODB------
+
+# ReplicaSet de shard
+  mongors1:
+    container_name: mongors1
+    image: mongo
+    command: mongod --shardsvr --replSet mongors1 --dbpath /data/db --port 27017
+    ports:
+      - 27017:27017
+    expose:
+      - "27017"
+    environment:
+      TERM: xterm
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - mongodata1:/data/db
+    networks:
+      - restaurant_net
+
+  mongors2:
+    container_name: mongors2
+    image: mongo
+    command: mongod --shardsvr --replSet mongors1 --dbpath /data/db --port 27017
+    ports:
+      - 27027:27017
+    expose:
+      - "27017"
+    environment:
+      TERM: xterm
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - mongodata2:/data/db
+    networks:
+      - restaurant_net
+
+  mongors3:
+    container_name: mongors3
+    image: mongo
+    command: mongod --shardsvr --replSet mongors1 --dbpath /data/db --port 27017
+    ports:
+      - 27037:27017
+    expose:
+      - "27017"
+    environment:
+      TERM: xterm
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - mongodata3:/data/db
+    networks:
+      - restaurant_net
+
+# ReplicaSet de configuracion
+  mongocfg1:
+    container_name: mongocfg1
+    image: mongo
+    command: mongod --configsvr --replSet mongors1conf --dbpath /data/db --port 27017
+    environment:
+      TERM: xterm
+    expose:
+      - "27017"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - config1:/data/db
+    networks:
+      - restaurant_net
+
+  mongocfg2:
+    container_name: mongocfg2
+    image: mongo
+    command: mongod --configsvr --replSet mongors1conf --dbpath /data/db --port 27017
+    environment:
+      TERM: xterm
+    expose:
+      - "27017"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - config2:/data/db
+    networks:
+      - restaurant_net
+
+  mongocfg3:
+    container_name: mongocfg3
+    image: mongo
+    command: mongod --configsvr --replSet mongors1conf --dbpath /data/db --port 27017
+    environment:
+      TERM: xterm
+    expose:
+      - "27017"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - config3:/data/db
+    networks:
+      - restaurant_net
+
+# Router del replicaset(donde debo montar mi shard)
+  mongos:
+    container_name: mongos
+    image: mongo
+    depends_on:
+      - mongocfg1
+      - mongocfg2
+      - mongocfg3 #****
+    command: mongos --configdb mongors1conf/mongocfg1:27017,mongocfg2:27017,mongocfg3:27017 --port 27017 --bind_ip_all
+    ports:
+      - 27019:27017
+    expose:
+      - "27017"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - restaurant_net
+    
+  mongo-express:
+    container_name: mongo-express
+    image: mongo-express:latest
+    restart: always
+    depends_on: 
+      - mongos
+    environment:
+     - ME_CONFIG_MONGODB_SERVER=mongos
+     - ME_CONFIG_MONGODB_PORT=27017 #Puerto expuesto
+    ports:
+      - "8081:8081"
+    networks:
+      - restaurant_net
+
+  search:
+    build:
+      context: ./src/search-service
+    ports:
+      - "4000:4000"
+    depends_on:
+      - elasticsearch
+      - app1
+    networks:
+      - restaurant_net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.10.2
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - restaurant_net
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.10.2
+    container_name: kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - restaurant_net

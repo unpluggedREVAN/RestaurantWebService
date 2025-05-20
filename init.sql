@@ -27,7 +27,10 @@ CREATE TABLE platos (
   id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
   id_menu BIGINT NOT NULL REFERENCES menus (id) ON DELETE CASCADE,
   nombre TEXT NOT NULL,
-  precio NUMERIC(10,2) NOT NULL
+  precio NUMERIC(10,2) NOT NULL,
+  categoria TEXT DEFAULT 'Sin categoría',
+  descripcion TEXT DEFAULT 'Producto sin descripción',
+  disponible BOOLEAN DEFAULT TRUE
 );
 
 -- Tabla de Reservas
@@ -82,21 +85,21 @@ INSERT INTO menus (id_restaurante, nombre) VALUES
   (3, 'Menú Pizzas'),
   (3, 'Menú Postres');
 
--- Insertar platos
-INSERT INTO platos (id_menu, nombre, precio) VALUES
-  (1, 'Ensalada César', 5.99),
-  (1, 'Pasta Alfredo', 8.99),
-  (1, 'Tarta de Queso', 4.50),
-  (2, 'Hamburguesa Vegana', 9.99),
-  (2, 'Tacos de Soya', 7.50),
-  (3, 'Doble Cheeseburger', 10.50),
-  (3, 'Aros de Cebolla', 4.25),
-  (3, 'Papas Fritas', 3.75),
-  (4, 'Pizza Margarita', 7.99),
-  (4, 'Pizza Pepperoni', 8.99),
-  (5, 'Tiramisú', 5.50),
-  (5, 'Helado de Vainilla', 3.99),
-  (5, 'Brownie con Helado', 6.25);
+-- Insertar platos (con categoría y descripción)
+INSERT INTO platos (id_menu, nombre, precio, categoria, descripcion, disponible) VALUES
+  (1, 'Ensalada César', 5.99, 'Ensaladas', 'Clásica con aderezo y crotones', TRUE),
+  (1, 'Pasta Alfredo', 8.99, 'Pasta', 'Con salsa Alfredo y queso parmesano', TRUE),
+  (1, 'Tarta de Queso', 4.50, 'Postres', 'Tarta fría de queso crema', TRUE),
+  (2, 'Hamburguesa Vegana', 9.99, 'Vegano', 'Hecha con proteína vegetal', TRUE),
+  (2, 'Tacos de Soya', 7.50, 'Vegano', 'Rellenos de soya texturizada', TRUE),
+  (3, 'Doble Cheeseburger', 10.50, 'Hamburguesas', 'Con doble carne y queso', TRUE),
+  (3, 'Aros de Cebolla', 4.25, 'Entradas', 'Aros empanizados y fritos', TRUE),
+  (3, 'Papas Fritas', 3.75, 'Entradas', 'Clásicas papas fritas', TRUE),
+  (4, 'Pizza Margarita', 7.99, 'Pizzas', 'Con tomate, mozzarella y albahaca', TRUE),
+  (4, 'Pizza Pepperoni', 8.99, 'Pizzas', 'Con rodajas de pepperoni', TRUE),
+  (5, 'Tiramisú', 5.50, 'Postres', 'Postre italiano de café y mascarpone', TRUE),
+  (5, 'Helado de Vainilla', 3.99, 'Postres', 'Helado artesanal de vainilla', TRUE),
+  (5, 'Brownie con Helado', 6.25, 'Postres', 'Brownie caliente con helado', TRUE);
 
 -- Insertar reservas (varios clientes)
 INSERT INTO reservas (id_cliente, id_restaurante, fecha, numero_personas, estado) VALUES

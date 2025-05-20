@@ -1,108 +1,116 @@
-import pool from '../db.js';
+import repo from '../repositories/usuariosRepository.js';
+import redisClient from '../config/redis.js';
 
-// GET /users
-export const getUsers = async (req, res) => {
-  try {
-    const result = await pool.query('SELECT * FROM usuarios');
-    res.status(200).json({ data: result.rows });
-  } catch (error) {
-    res.status(500).json({ message: 'Error al obtener usuarios', error: error.message });
-  }
-};
-
-// GET /users/:id
-export const getUser = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const result = await pool.query('SELECT * FROM usuarios WHERE id = $1', [id]);
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
-    }
-
-    res.status(200).json({ data: result.rows[0] });
-  } catch (error) {
-    res.status(500).json({ message: 'Error al obtener usuario', error: error.message });
-  }
-};
-
-// POST /users (opcional si no usás auth.register)
-export const createUser = async (req, res) => {
+// POST /usuarios
+export const crearUsuario = async (req, res) => {
   const { nombre, correo, tipo_usuario } = req.body;
-
   if (!nombre || !correo || !tipo_usuario) {
-    return res.status(400).json({ message: 'Todos los campos son requeridos' });
+    return res.status(400).json({ status: 'error', message: 'Faltan datos requeridos.' });
   }
-
   try {
-    const result = await pool.query(
-      'INSERT INTO usuarios (nombre, correo, tipo_usuario) VALUES ($1, $2, $3) RETURNING *',
-      [nombre, correo, tipo_usuario]
-    );
-
-    res.status(201).json({ message: 'Usuario creado', data: result.rows[0] });
+    const nuevo = await repo.create({ nombre, correo, tipo_usuario });
+    res.status(201).json({
+      status: 'success',
+      message: 'Usuario creado exitosamente',
+      data: nuevo
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Error al crear usuario', error: error.message });
+    res.status(500).json({ status: 'error', message: 'Error al crear el usuario', error: error.message });
   }
 };
 
-// PUT /users/:id
-export const updateUser = async (req, res) => {
-  const { id } = req.params;
-  const { nombre, correo, tipo_usuario } = req.body;
-
+// GET /usuarios
+export const getUsuarios = async (req, res) => {
+  const cacheKey = 'usuarios:all';
   try {
-    const check = await pool.query('SELECT * FROM usuarios WHERE id = $1', [id]);
-    if (check.rows.length === 0) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      return res.status(200).json({
+        status: 'success',
+        message: 'Usuarios obtenidos desde caché',
+        data: JSON.parse(cached)
+      });
     }
-
-    const result = await pool.query(
-      'UPDATE usuarios SET nombre = $1, correo = $2, tipo_usuario = $3 WHERE id = $4 RETURNING *',
-      [nombre, correo, tipo_usuario, id]
-    );
-
-    res.status(200).json({ message: 'Usuario actualizado', data: result.rows[0] });
-  } catch (error) {
-    res.status(500).json({ message: 'Error al actualizar usuario', error: error.message });
-  }
-};
-
-// DELETE /users/:id
-export const deleteUser = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const check = await pool.query('SELECT * FROM usuarios WHERE id = $1', [id]);
-    if (check.rows.length === 0) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
-    }
-
-    await pool.query('DELETE FROM usuarios WHERE id = $1', [id]);
-    res.status(200).json({ message: 'Usuario eliminado con éxito' });
-  } catch (error) {
-    res.status(500).json({ message: 'Error al eliminar usuario', error: error.message });
-  }
-};
-
-export const getReservationsByUser = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const result = await pool.query(
-      'SELECT * FROM reservas WHERE id_cliente = $1',
-      [id]
-    );
-
+    const lista = await repo.getAll();
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(lista));
     res.status(200).json({
-      message: 'Reservas obtenidas exitosamente',
-      data: result.rows
+      status: 'success',
+      message: 'Usuarios obtenidos desde la base de datos',
+      data: lista
     });
   } catch (error) {
-    res.status(500).json({
-      message: 'Error al obtener reservas del usuario',
-      error: error.message
+    res.status(500).json({ status: 'error', message: 'Error al obtener usuarios', error: error.message });
+  }
+};
+
+// GET /usuarios/:id
+export const getUsuarioById = async (req, res) => {
+  const { id } = req.params;
+  const cacheKey = `usuario:${id}`;
+  try {
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      return res.status(200).json({
+        status: 'success',
+        message: 'Usuario obtenido desde caché',
+        data: JSON.parse(cached)
+      });
+    }
+    const usuario = await repo.getById(id);
+    if (!usuario) {
+      return res.status(404).json({ status: 'error', message: 'Usuario no encontrado' });
+    }
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(usuario));
+    res.status(200).json({
+      status: 'success',
+      message: 'Usuario obtenido desde la base de datos',
+      data: usuario
     });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: 'Error al obtener el usuario', error: error.message });
+  }
+};
+
+// PUT /usuarios/:id
+export const actualizarUsuario = async (req, res) => {
+  const { id } = req.params;
+  const cambios = req.body;
+  try {
+    const existente = await repo.getById(id);
+    if (!existente) {
+      return res.status(404).json({ status: 'error', message: 'Usuario no encontrado' });
+    }
+    const actualizado = await repo.update(id, cambios);
+    // invalidar caché
+    await redisClient.del(`usuario:${id}`);
+    await redisClient.del('usuarios:all');
+    res.status(200).json({
+      status: 'success',
+      message: 'Usuario actualizado exitosamente',
+      data: actualizado
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: 'Error al actualizar el usuario', error: error.message });
+  }
+};
+
+// DELETE /usuarios/:id
+export const eliminarUsuario = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const existente = await repo.getById(id);
+    if (!existente) {
+      return res.status(404).json({ status: 'error', message: 'Usuario no encontrado' });
+    }
+    await repo.remove(id);
+    // invalidar caché
+    await redisClient.del(`usuario:${id}`);
+    await redisClient.del('usuarios:all');
+    res.status(200).json({
+      status: 'success',
+      message: 'Usuario eliminado exitosamente'
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: 'Error al eliminar el usuario', error: error.message });
   }
 };

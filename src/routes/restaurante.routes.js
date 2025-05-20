@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
   getRestaurants,
-  getRestaurantId,
+  getRestaurantById,
   crearRestaurante,
   actualizarRestaurante,
   eliminarRestaurante
@@ -75,7 +75,7 @@ router.get('/restaurants', getRestaurants);
  *      404:
  *        description: Restaurante no encontrado
  */
-router.get('/restaurants/:id', getRestaurantId);
+router.get('/restaurants/:id', getRestaurantById);
 
 /**
  * @swagger

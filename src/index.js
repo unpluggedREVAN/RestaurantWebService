@@ -5,6 +5,7 @@ import swaggerJSDoc from 'swagger-jsdoc';
 import swaggerUI from 'swagger-ui-express';
 
 import { PORT } from './config.js';
+import connectMongo from './config/mongo.js';
 
 // Rutas de negocio
 import userRoutes from './routes/user.routes.js';
@@ -14,14 +15,13 @@ import platoRoutes from './routes/plato.routes.js';
 import reservationRoutes from './routes/reservation.routes.js';
 import restauranteRoutes from './routes/restaurante.routes.js';
 
-// ⚠️ Autenticación desactivada temporalmente
 // import authRoutes from './routes/auth.routes.js';
 
 dotenv.config();
 
 const app = express();
 
-// Configuración de Swagger
+// config swagger
 const swaggerSpec = {
   definition: {
     openapi: "3.0.0",
@@ -32,7 +32,7 @@ const swaggerSpec = {
     },
     servers: [
       {
-        url: "http://localhost:3000" // Corregido para coincidir con el puerto real
+        url: "http://localhost:3000" 
       }
     ]
   },
@@ -71,7 +71,7 @@ app.use(restauranteRoutes);
 // Ruta de documentación
 app.use("/api-docs", swaggerUI.serve, swaggerUI.setup(swaggerJSDoc(swaggerSpec)));
 
-// Middleware para manejo de errores
+// manejo de errores - middleware
 app.use((err, req, res, next) => {
   console.error("Error:", err.stack);
   console.error("Error completo:", err);
@@ -82,8 +82,19 @@ export default app;
 
 // inicia
 if (process.env.NODE_ENV !== 'test') {
-  console.log("Instancia activa en puerto:", PORT); // temporal, logs de control
-  app.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
-  });
+  const startServer = async () => {
+    try {
+      await connectMongo();
+      console.log("MongoDB conectado");
+      console.log("Instancia activa en puerto:", PORT);
+      app.listen(PORT, () => {
+        console.log(`Servidor corriendo en http://localhost:${PORT}`);
+      });
+    } catch (error) {
+      console.error("No se pudo iniciar el servidor:", error.message);
+      process.exit(1);
+    }
+  };
+
+  startServer();
 }

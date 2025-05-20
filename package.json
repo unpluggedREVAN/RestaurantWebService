@@ -6,16 +6,20 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "cross-env DB_USER=postgres DB_PASSWORD=admin2525 DB_HOST=localhost DB_DATABASE=restaurante DB_PORT=5432 NODE_OPTIONS=--experimental-vm-modules jest --coverage"
+    "test": "cross-env DB_USER=postgres DB_PASSWORD=admin2525 DB_HOST=localhost DB_DATABASE=restaurante DB_PORT=5432 NODE_OPTIONS=--experimental-vm-modules jest",
+    "test:unit": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --testPathPattern=tests/unit",
+    "test:integration": "cross-env DB_USER=postgres DB_PASSWORD=admin2525 DB_HOST=localhost DB_DATABASE=restaurante DB_PORT=5432 NODE_OPTIONS=--experimental-vm-modules jest --testPathPattern=tests/integration"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@elastic/elasticsearch": "^9.0.1",
     "bcrypt": "^5.1.1",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "mongoose": "^8.14.3",
     "morgan": "^1.10.0",
     "pg": "^8.14.1",
     "redis": "^5.0.1",

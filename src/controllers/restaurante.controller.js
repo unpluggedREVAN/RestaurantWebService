@@ -1,81 +1,70 @@
-import pool from '../db.js';
+import repo from '../repositories/restaurantesRepository.js';
 import redisClient from '../config/redis.js';
-
 
 // GET /restaurants
 export const getRestaurants = async (req, res) => {
   const cacheKey = 'restaurants:all';
 
   try {
-    // 1. Buscar en caché
-    const cachedData = await redisClient.get(cacheKey);
-    if (cachedData) {
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
       return res.status(200).json({
-        status: "success",
-        message: "Restaurantes obtenidos desde caché",
-        data: JSON.parse(cachedData)
+        status: 'success',
+        message: 'Restaurantes obtenidos desde caché',
+        data: JSON.parse(cached)
       });
     }
 
-    // 2. Consultar la base de datos
-    const result = await pool.query('SELECT * FROM restaurantes');
-
-    // 3. Guardar en caché con expiración de 5 minutos
-    await redisClient.setEx(cacheKey, 300, JSON.stringify(result.rows));
+    const restaurantes = await repo.getAll();
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(restaurantes));
 
     res.status(200).json({
-      status: "success",
-      message: "Restaurantes obtenidos desde base de datos",
-      data: result.rows
+      status: 'success',
+      message: 'Restaurantes obtenidos desde base de datos',
+      data: restaurantes
     });
   } catch (error) {
     res.status(500).json({
-      status: "error",
-      message: "Error al obtener los restaurantes",
+      status: 'error',
+      message: 'Error al obtener los restaurantes',
       error: error.message
     });
   }
 };
 
-
 // GET /restaurants/:id
-export const getRestaurantId = async (req, res) => {
+export const getRestaurantById = async (req, res) => {
   const { id } = req.params;
   const cacheKey = `restaurant:${id}`;
 
   try {
-    // 1. Buscar en caché
     const cached = await redisClient.get(cacheKey);
     if (cached) {
       return res.status(200).json({
-        status: "success",
-        message: "Restaurante obtenido desde caché",
+        status: 'success',
+        message: 'Restaurante obtenido desde caché',
         data: JSON.parse(cached)
       });
     }
 
-    // 2. Consultar base de datos
-    const result = await pool.query('SELECT * FROM restaurantes WHERE id = $1', [id]);
-
-    if (result.rows.length === 0) {
+    const restaurante = await repo.getById(id);
+    if (!restaurante) {
       return res.status(404).json({
-        status: "error",
-        message: "Restaurante no encontrado"
+        status: 'error',
+        message: 'Restaurante no encontrado'
       });
     }
 
-    // 3. Guardar en caché con expiración de 5 minutos
-    await redisClient.setEx(cacheKey, 300, JSON.stringify(result.rows[0]));
-
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(restaurante));
     res.status(200).json({
-      status: "success",
-      message: "Restaurante obtenido desde base de datos",
-      data: result.rows[0]
+      status: 'success',
+      message: 'Restaurante obtenido desde base de datos',
+      data: restaurante
     });
   } catch (error) {
     res.status(500).json({
-      status: "error",
-      message: "Error al obtener el restaurante",
+      status: 'error',
+      message: 'Error al obtener el restaurante',
       error: error.message
     });
   }
@@ -84,31 +73,26 @@ export const getRestaurantId = async (req, res) => {
 // POST /restaurants
 export const crearRestaurante = async (req, res) => {
   const { nombre, direccion, telefono, id_administrador } = req.body;
-
   if (!nombre || !direccion || !telefono || !id_administrador) {
     return res.status(400).json({
-      status: "error",
-      message: "Todos los campos son obligatorios"
+      status: 'error',
+      message: 'Faltan datos requeridos.'
     });
   }
-
   try {
-    const result = await pool.query(
-      `INSERT INTO restaurantes (nombre, direccion, telefono, id_administrador)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [nombre, direccion, telefono, id_administrador]
-    );
+    const nuevo = await repo.create({ nombre, direccion, telefono, id_administrador });
+    // invalidar lista en caché
+    await redisClient.del('restaurants:all');
 
     res.status(201).json({
-      status: "success",
-      message: "Restaurante creado exitosamente",
-      data: result.rows[0]
+      status: 'success',
+      message: 'Restaurante creado exitosamente',
+      data: nuevo
     });
   } catch (error) {
     res.status(500).json({
-      status: "error",
-      message: "Error al crear el restaurante",
+      status: 'error',
+      message: 'Error al crear el restaurante',
       error: error.message
     });
   }
@@ -117,34 +101,33 @@ export const crearRestaurante = async (req, res) => {
 // PUT /restaurants/:id
 export const actualizarRestaurante = async (req, res) => {
   const { id } = req.params;
-  const { nombre, direccion, telefono, id_administrador } = req.body;
+  const cambios = req.body;
 
   try {
-    const check = await pool.query('SELECT * FROM restaurantes WHERE id = $1', [id]);
-    if (check.rows.length === 0) {
+    const existente = await repo.getById(id);
+    if (!existente) {
       return res.status(404).json({
-        status: "error",
-        message: "Restaurante no encontrado"
+        status: 'error',
+        message: 'Restaurante no encontrado'
       });
     }
 
-    const result = await pool.query(
-      `UPDATE restaurantes
-       SET nombre = $1, direccion = $2, telefono = $3, id_administrador = $4
-       WHERE id = $5
-       RETURNING *`,
-      [nombre, direccion, telefono, id_administrador, id]
-    );
+    const actualizado = await repo.update(id, cambios);
+    // invalidar caché
+    await Promise.all([
+      redisClient.del('restaurants:all'),
+      redisClient.del(`restaurant:${id}`)
+    ]);
 
     res.status(200).json({
-      status: "success",
-      message: "Restaurante actualizado exitosamente",
-      data: result.rows[0]
+      status: 'success',
+      message: 'Restaurante actualizado exitosamente',
+      data: actualizado
     });
   } catch (error) {
     res.status(500).json({
-      status: "error",
-      message: "Error al actualizar el restaurante",
+      status: 'error',
+      message: 'Error al actualizar el restaurante',
       error: error.message
     });
   }
@@ -155,45 +138,29 @@ export const eliminarRestaurante = async (req, res) => {
   const { id } = req.params;
 
   try {
-    const check = await pool.query('SELECT * FROM restaurantes WHERE id = $1', [id]);
-    if (check.rows.length === 0) {
+    const existente = await repo.getById(id);
+    if (!existente) {
       return res.status(404).json({
-        status: "error",
-        message: "Restaurante no encontrado"
+        status: 'error',
+        message: 'Restaurante no encontrado'
       });
     }
 
-    await pool.query('DELETE FROM restaurantes WHERE id = $1', [id]);
+    await repo.remove(id);
+    // invalidar caché
+    await Promise.all([
+      redisClient.del('restaurants:all'),
+      redisClient.del(`restaurant:${id}`)
+    ]);
 
     res.status(200).json({
-      status: "success",
-      message: "Restaurante eliminado exitosamente"
+      status: 'success',
+      message: 'Restaurante eliminado exitosamente'
     });
   } catch (error) {
     res.status(500).json({
-      status: "error",
-      message: "Error al eliminar el restaurante",
-      error: error.message
-    });
-  }
-};
-
-export const getReservationsByRestaurant = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const result = await pool.query(
-      'SELECT * FROM reservas WHERE id_restaurante = $1',
-      [id]
-    );
-
-    res.status(200).json({
-      message: 'Reservas del restaurante obtenidas exitosamente',
-      data: result.rows
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: 'Error al obtener reservas del restaurante',
+      status: 'error',
+      message: 'Error al eliminar el restaurante',
       error: error.message
     });
   }

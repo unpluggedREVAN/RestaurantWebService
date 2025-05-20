@@ -4,6 +4,7 @@ import {
   getPlatoId,
   actualizarPlato,
   eliminarPlato,
+  getAllPlatos,
   getPlatosByMenu
 } from '../controllers/plato.controller.js';
 
@@ -166,5 +167,6 @@ router.delete('/platos/:id', eliminarPlato);
  *                $ref: '#/components/schemas/Plato'
  */
 router.get('/menus/:id/platos', getPlatosByMenu);
+router.get('/platos', getAllPlatos);
 
 export default router;

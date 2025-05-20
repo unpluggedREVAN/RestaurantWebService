@@ -2,7 +2,7 @@
 import { createClient } from 'redis';
 
 const redisClient = createClient({
-  url: 'redis://redis:6379' // usa el nombre del servicio Redis del docker-compose
+  url: 'redis://redis:6379' 
 });
 
 redisClient.on('error', (err) => console.error('Error con Redis:', err));
