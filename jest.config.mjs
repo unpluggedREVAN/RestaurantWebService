@@ -12,5 +12,6 @@ const config = {
   // testMatch: ["**/?(*.)+(spec|test).[jt]s"],
   // Opcional: entorno de ejecución de pruebas (por defecto "node" para proyectos backend)
   // testEnvironment: "node",
+  setupFiles: ['<rootDir>/jest.setup.js']
 };
 export default config;
