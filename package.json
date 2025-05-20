@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest"
+    "test": "cross-env DB_USER=postgres DB_PASSWORD=admin2525 DB_HOST=localhost DB_DATABASE=restaurante DB_PORT=5432 NODE_OPTIONS=--experimental-vm-modules jest"
   },
   "keywords": [],
   "author": "",
