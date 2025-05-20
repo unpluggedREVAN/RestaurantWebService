@@ -64,3 +64,13 @@ jobs:
 
       - name: Publicar en DockerHub
         run: docker push unpluggedrevan/restaurante-api:latest
+
+      - name: Construir imagen de búsqueda
+        run: docker build -t restaurante-search ./src/search-service
+
+      - name: Etiquetar imagen de búsqueda
+        run: docker tag restaurante-search unpluggedrevan/restaurante-search:latest
+
+      - name: Publicar imagen de búsqueda
+        run: docker push unpluggedrevan/restaurante-search:latest
+
