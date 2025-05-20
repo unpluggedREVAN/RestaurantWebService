@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: CI/CD Pipeline
 
 on:
   push:
@@ -9,7 +9,7 @@ on:
       - '**'
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     services:
@@ -44,8 +44,20 @@ jobs:
       - name: Instalar dependencias
         run: npm install
 
-      - name: Validar que el proyecto arranca
+      - name: Validar sintaxis de arranque
         run: node -c src/index.js
 
       - name: Construir imagen Docker
         run: docker build -t restaurante-api .
+
+      - name: Login en DockerHub
+        env:
+          DOCKER_USER: ${{ secrets.DOCKER_USER }}
+          DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
+        run: echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+
+      - name: Etiquetar imagen con DockerHub repo
+        run: docker tag restaurante-api unpluggedrevan/restaurante-api:latest
+
+      - name: Publicar imagen en DockerHub
+        run: docker push unpluggedrevan/restaurante-api:latest
