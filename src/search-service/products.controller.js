@@ -1,11 +1,27 @@
 import esClient from './elastic.js';
 import axios from 'axios';
+import redisClient from './config/redis.js';
 
 // GET /search/products?q=texto
 export const buscarProductos = async (req, res) => {
   const { q } = req.query;
 
+  if (!q) {
+    return res.status(400).json({ status: 'error', message: 'Falta el parámetro q' });
+  }
+
+  const cacheKey = `search:q:${q.toLowerCase()}`;
+
   try {
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      return res.status(200).json({
+        status: 'success',
+        message: 'Resultado desde caché',
+        results: JSON.parse(cached)
+      });
+    }
+
     const { body } = await esClient.search({
       index: 'productos',
       body: {
@@ -18,12 +34,18 @@ export const buscarProductos = async (req, res) => {
       }
     });
 
-    res.json({
-      results: body.hits.hits.map((h) => h._source)
+    const results = body.hits.hits.map((h) => h._source);
+
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(results)); // TTL: 5 minutos
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Resultado desde ElasticSearch',
+      results
     });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ status: 'error', message: error.message });
   }
 };
 
@@ -31,7 +53,18 @@ export const buscarProductos = async (req, res) => {
 export const buscarPorCategoria = async (req, res) => {
   const { categoria } = req.params;
 
+  const cacheKey = `search:cat:${categoria.toLowerCase()}`;
+
   try {
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      return res.status(200).json({
+        status: 'success',
+        message: 'Resultado desde caché',
+        results: JSON.parse(cached)
+      });
+    }
+
     const { body } = await esClient.search({
       index: 'productos',
       body: {
@@ -41,12 +74,18 @@ export const buscarPorCategoria = async (req, res) => {
       }
     });
 
-    res.json({
-      results: body.hits.hits.map((h) => h._source)
+    const results = body.hits.hits.map((h) => h._source);
+
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(results));
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Resultado desde ElasticSearch',
+      results
     });
 
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ status: 'error', message: error.message });
   }
 };
 
