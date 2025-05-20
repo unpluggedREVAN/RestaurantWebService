@@ -45,7 +45,7 @@ jobs:
         run: npm install
 
       - name: Ejecutar pruebas y mostrar cobertura
-        run: npm test
+        run: npm run test:unit
 
       - name: Validar sintaxis
         run: node -c src/index.js
