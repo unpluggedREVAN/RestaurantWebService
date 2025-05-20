@@ -7,7 +7,7 @@ import {
   DB_PORT,
 } from './config.js';
 
-// pool de conexión a PostgreSQL
+// pool conexión postgres
 const pool = new pg.Pool({
   user: DB_USER,
   host: DB_HOST,
@@ -16,5 +16,4 @@ const pool = new pg.Pool({
   port: DB_PORT,
 });
 
-// exportar el pool para usarlo en controladores
 export default pool;

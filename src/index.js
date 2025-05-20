@@ -15,14 +15,13 @@ import platoRoutes from './routes/plato.routes.js';
 import reservationRoutes from './routes/reservation.routes.js';
 import restauranteRoutes from './routes/restaurante.routes.js';
 
-// ⚠️ Autenticación desactivada temporalmente
 // import authRoutes from './routes/auth.routes.js';
 
 dotenv.config();
 
 const app = express();
 
-// Configuración de Swagger
+// config swagger
 const swaggerSpec = {
   definition: {
     openapi: "3.0.0",
@@ -33,7 +32,7 @@ const swaggerSpec = {
     },
     servers: [
       {
-        url: "http://localhost:3000" // Corregido para coincidir con el puerto real
+        url: "http://localhost:3000" 
       }
     ]
   },
@@ -72,7 +71,7 @@ app.use(restauranteRoutes);
 // Ruta de documentación
 app.use("/api-docs", swaggerUI.serve, swaggerUI.setup(swaggerJSDoc(swaggerSpec)));
 
-// Middleware para manejo de errores
+// manejo de errores - middleware
 app.use((err, req, res, next) => {
   console.error("Error:", err.stack);
   console.error("Error completo:", err);
