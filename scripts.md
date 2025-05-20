@@ -1,8 +1,3 @@
-
-## Pendientes
-
-- Configuración de mongo express extra
-
 ```bash
 mongo-express  | Server is open to allow connections from anyone (0.0.0.0)
 mongo-express  | basicAuth credentials are "admin:pass", it is recommended you change this in your config.js! 
