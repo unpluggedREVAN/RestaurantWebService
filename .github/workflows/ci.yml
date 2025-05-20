@@ -44,7 +44,10 @@ jobs:
       - name: Instalar dependencias
         run: npm install
 
-      - name: Validar sintaxis de arranque
+      - name: Ejecutar pruebas y mostrar cobertura
+        run: npm test
+
+      - name: Validar sintaxis
         run: node -c src/index.js
 
       - name: Construir imagen Docker
@@ -56,8 +59,8 @@ jobs:
           DOCKER_PASS: ${{ secrets.DOCKER_PASS }}
         run: echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
 
-      - name: Etiquetar imagen con DockerHub repo
+      - name: Etiquetar imagen para DockerHub
         run: docker tag restaurante-api unpluggedrevan/restaurante-api:latest
 
-      - name: Publicar imagen en DockerHub
+      - name: Publicar en DockerHub
         run: docker push unpluggedrevan/restaurante-api:latest
