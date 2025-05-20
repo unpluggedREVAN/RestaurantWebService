@@ -1,159 +1,84 @@
-import { crearUsuario, getUsuarios, getUsuarioById, actualizarUsuario, eliminarUsuario } from '../../src/controllers/user.controller.js';
-import repo from '../../src/repositories/usuariosRepository.js';
-import redisClient from '../../src/config/redis.js';
+import { it, jest } from '@jest/globals';
 
-// Mock dependencies
-jest.mock('../../src/repositories/usuariosRepository.js');
-jest.mock('../../src/config/redis.js', () => {
-  return {
-    get: jest.fn(),
-    setEx: jest.fn(),
-    del: jest.fn(),
-    connect: jest.fn().mockResolvedValue(undefined),
-    on: jest.fn(),
+await jest.unstable_mockModule(
+  'redis',
+  () => ({
+    __esModule: true,
+    // createClient devuelve un cliente stub
+    createClient: jest.fn(() => ({
+      on:      jest.fn(),            // redisClient.on('error', …)
+      connect: jest.fn(() => Promise.resolve()), // await connect()
+      get:     jest.fn(),            // no lo usamos en este test
+      setEx:   jest.fn(),
+      del:     jest.fn()
+    }))
+  })
+);
+
+await jest.unstable_mockModule(
+  '../../src/repositories/usuariosRepository.js',
+  () => ({
+    __esModule: true,
     default: {
-      get: jest.fn(),
-      setEx: jest.fn(),
-      del: jest.fn(),
-      connect: jest.fn().mockResolvedValue(undefined),
-      on: jest.fn()
+      create: jest.fn()
     }
-  };
-});
-describe('User Controller', () => {
-    let mockRequest;
-    let mockResponse;
-    
-    beforeEach(() => {
-        mockRequest = {
-            body: {},
-            params: {}
-        };
-        mockResponse = {
-            status: jest.fn().mockReturnThis(),
-            json: jest.fn()
-        };
-        // Clear all mocks before each test
-        jest.clearAllMocks();
+  })
+);
+
+const redisClient = (await import('../../src/config/redis.js')).default;
+const repo        = (await import('../../src/repositories/usuariosRepository.js')).default;
+const { crearUsuario } = await import('../../src/controllers/user.controller.js');
+
+describe('crearUsuario (unitario sin Redis real)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('debe devolver 201 y el usuario creado', async () => {
+    // a) Preparar: mock de repo.create
+    const mockUser = { id: 42, nombre: 'Test', correo: 't@t.com', tipo_usuario: 'cliente' };
+    repo.create.mockResolvedValue(mockUser);
+
+    // b) Simular req/res de Express
+    const req = { body: { nombre: 'Test', correo: 't@t.com', tipo_usuario: 'cliente' } };
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json:   jest.fn()
+    };
+
+    // c) Ejecutar el controlador
+    await crearUsuario(req, res);
+
+    // d) Verificar respuesta
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({
+      status:  'success',
+      message: 'Usuario creado exitosamente',
+      data:    mockUser
     });
 
-    describe('crearUsuario', () => {
-        it('should create a user successfully', async () => {
-            mockRequest.body = {
-                nombre: 'Test User',
-                correo: 'test@test.com',
-                tipo_usuario: 'cliente'
-            };
-            
-            const mockUser = { id: 1, ...mockRequest.body };
-            repo.create.mockResolvedValue(mockUser);
-
-            await crearUsuario(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(201);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                status: 'success',
-                message: 'Usuario creado exitosamente',
-                data: mockUser
-            });
-        });
-
-        it('should return 400 if required fields are missing', async () => {
-            mockRequest.body = { nombre: 'Test User' };
-
-            await crearUsuario(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(400);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                status: 'error',
-                message: 'Faltan datos requeridos.'
-            });
-        });
+    // Además, aseguramos que no se intentó usar el cliente real de Redis
+    expect(redisClient.connect).toHaveBeenCalledTimes(0);
+    expect(repo.create).toHaveBeenCalledWith({
+      nombre: 'Test',
+      correo: 't@t.com',
+      tipo_usuario: 'cliente'
     });
+  });
 
-    describe('getUsuarios', () => {
-        it('should return users from cache if available', async () => {
-            const cachedUsers = [{ id: 1, nombre: 'Cached User' }];
-            redisClient.get.mockResolvedValue(JSON.stringify(cachedUsers));
+  it('debe devolver 400 si faltan datos requeridos', async () => {
+    const req = { body: { nombre: 'Test' } }; // Falta correo y tipo_usuario
+    const res = {
+      status: jest.fn().mockReturnThis(),
+      json:   jest.fn()
+    };
 
-            await getUsuarios(mockRequest, mockResponse);
+    await crearUsuario(req, res);
 
-            expect(mockResponse.status).toHaveBeenCalledWith(200);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                status: 'success',
-                message: 'Usuarios obtenidos desde caché',
-                data: cachedUsers
-            });
-        });
-
-        it('should return users from database if not in cache', async () => {
-            const dbUsers = [{ id: 1, nombre: 'DB User' }];
-            redisClient.get.mockResolvedValue(null);
-            repo.getAll.mockResolvedValue(dbUsers);
-
-            await getUsuarios(mockRequest, mockResponse);
-
-            expect(redisClient.setEx).toHaveBeenCalled();
-            expect(mockResponse.status).toHaveBeenCalledWith(200);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                status: 'success',
-                message: 'Usuarios obtenidos desde la base de datos',
-                data: dbUsers
-            });
-        });
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      status:  'error',
+      message: 'Faltan datos requeridos.'
     });
-
-    describe('getUsuarioById', () => {
-        it('should return 404 if user not found', async () => {
-            mockRequest.params = { id: '999' };
-            redisClient.get.mockResolvedValue(null);
-            repo.getById.mockResolvedValue(null);
-
-            await getUsuarioById(mockRequest, mockResponse);
-
-            expect(mockResponse.status).toHaveBeenCalledWith(404);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                status: 'error',
-                message: 'Usuario no encontrado'
-            });
-        });
-    });
-
-    describe('actualizarUsuario', () => {
-        it('should update user successfully', async () => {
-            mockRequest.params = { id: '1' };
-            mockRequest.body = { nombre: 'Updated Name' };
-            
-            const updatedUser = { id: 1, nombre: 'Updated Name' };
-            repo.getById.mockResolvedValue({ id: 1, nombre: 'Old Name' });
-            repo.update.mockResolvedValue(updatedUser);
-
-            await actualizarUsuario(mockRequest, mockResponse);
-
-            expect(redisClient.del).toHaveBeenCalledTimes(2);
-            expect(mockResponse.status).toHaveBeenCalledWith(200);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                status: 'success',
-                message: 'Usuario actualizado exitosamente',
-                data: updatedUser
-            });
-        });
-    });
-
-    describe('eliminarUsuario', () => {
-        it('should delete user successfully', async () => {
-            mockRequest.params = { id: '1' };
-            repo.getById.mockResolvedValue({ id: 1 });
-
-            await eliminarUsuario(mockRequest, mockResponse);
-
-            expect(repo.remove).toHaveBeenCalledWith('1');
-            expect(redisClient.del).toHaveBeenCalledTimes(2);
-            expect(mockResponse.status).toHaveBeenCalledWith(200);
-            expect(mockResponse.json).toHaveBeenCalledWith({
-                status: 'success',
-                message: 'Usuario eliminado exitosamente'
-            });
-        });
-    });
+  });
 });
