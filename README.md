@@ -1,82 +1,155 @@
-# TC 1: Resturantes Rest-API
+# Sistema de Gestión de Restaurantes – Proyecto 1
 
-## Proyecto - Trabajo Corto 1 - Base de Datos II  
+## Base de Datos II — Instituto Tecnológico de Costa Rica  
 **Autores:** Sebastián Chacón y Pablo Agüero  
-**Profesor:** Kenneth Obando  
-**Fecha de entrega:** 28 de marzo, 2025
+**Profesor:** Kenneth Obando Rodríguez  
 
 ---
 
-## Descripción General
+## Arquitectura General
 
-Este proyecto consiste en una API REST para la gestión de usuarios, restaurantes, menús, reservas y pedidos, desarrollada en Node.js con PostgreSQL y contenedorizada usando Docker. Se implementó **Keycloak** como sistema de autenticación (servicio externo por contenedor) y se organizaron todos los servicios mediante `docker-compose`.
-
-A pesar de múltiples intentos de integración, **Keycloak presentó conflictos internos con la validación de tokens (issuer y audience)** que no pudieron resolverse completamente. Sin embargo, el resto del sistema funciona cuando se omite la validación estricta de JWT en `verifyToken`.
-
----
-
-## Autenticación (Keycloak)
-
-> **Problema actual:**  
-Keycloak emite el token correctamente, pero la validación estricta de `issuer` y `audience` lanza errores en `verifyToken`.  
-Se modificó temporalmente el middleware para **permitir pruebas** y así validar el funcionamiento del resto del sistema.
-
-**Endpoints esperados:**
-
-| Método | Endpoint             | Descripción                        |
-|--------|----------------------|------------------------------------|
-| POST   | /auth/register       | Registro de usuario                |
-| POST   | /auth/login          | Login y obtención de token JWT     |
-| GET    | /users/me            | Obtener perfil autenticado         |
-| PUT    | /users/:id           | Actualizar usuario                 |
-| DELETE | /users/:id           | Eliminar usuario                   |
+Servicios incluidos:
+- `nginx` – Balanceador de carga
+- `app1`, `app2` – API REST principal
+- `db` – PostgreSQL
+- `redis` – Sistema de caché
+- `search` – Microservicio de búsqueda
+- `elasticsearch` y `kibana`
+- `mongos`, `mongors1–3`, `mongocfg1–3` – MongoDB con replicación y sharding
+- `mongo-express` – Administración web MongoDB
 
 ---
 
-## Docker y Orquestación
+## Ejecución del sistema
 
-El archivo `docker-compose.yml` define:
-
-- `db` (PostgreSQL)
-- `auth` (Keycloak)
-- `app` (API Node.js)
-- `postman` (para pruebas internas por los mismos problemas que se mencionan antes)
-
-> Se probó acceso entre contenedores mediante la red `restaurant_net`.
+### 1. Clonar y levantar servicios
+```bash
+git clone https://github.com/tu-repo/restaurantes.git
+cd restaurantes
+docker compose up --build -d
+````
 
 ---
 
-## Pruebas Unitarias
+## 2. Inicializar replicación y sharding de MongoDB
 
-Se desarrollaron pruebas unitarias con **Jest** para los controladores y rutas principales del sistema. En total se ejecutaron **39 pruebas**, de las cuales **20 fueron exitosas**.
+### Conectarse al contenedor `mongors1` y configurar el ReplicaSet:
 
-La cobertura general fue:
+```bash
+docker exec -it mongors1 mongosh
+```
 
-- **Statements:** 81.5%  
-- **Funciones:** 72.2%  
-- **Líneas:** 81.5%  
-- **Branches:** 54.4%
+```js
+rs.initiate({
+  _id: "mongors1",
+  members: [
+    { _id: 0, host: "mongors1:27017" },
+    { _id: 1, host: "mongors2:27017" },
+    { _id: 2, host: "mongors3:27017" }
+  ]
+})
+```
 
-Algunas pruebas no se ejecutaron correctamente debido a restricciones con la validación de tokens durante el testeo automatizado, pero el sistema funciona correctamente en ejecución manual.
+### Configurar el ReplicaSet de configuración:
+
+```bash
+docker exec -it mongocfg1 mongosh
+```
+
+```js
+rs.initiate({
+  _id: "mongors1conf",
+  configsvr: true,
+  members: [
+    { _id: 0, host: "mongocfg1:27017" },
+    { _id: 1, host: "mongocfg2:27017" },
+    { _id: 2, host: "mongocfg3:27017" }
+  ]
+})
+```
+
+### Agregar shard al router `mongos`:
+
+```bash
+docker exec -it mongos mongosh
+```
+
+```js
+sh.addShard("mongors1/mongors1:27017,mongors2:27017,mongors3:27017")
+```
 
 ---
 
-## Cómo Probar
+## 3. Verificación de servicios
 
-1. Levantar el sistema:
-   ```bash
-   docker compose up --build
-   ```
+### PostgreSQL:
 
-2. Entrar al contenedor de Postman para probar:
-- `https://localhost:6901`
-- `Usuario: kasm_user`
-- `Contraseña: postman`
+```bash
+docker exec -it postgresdb psql -U postgres -d restaurante
+```
 
-3. Probar endpoints REST usando tokens JWT si se desactiva el issuer o simplemente comentar la validación del token para hacer pruebas funcionales.
+### Redis:
+
+```bash
+docker exec -it redis redis-cli
+```
+
+### ElasticSearch:
+
+```bash
+curl http://localhost:9200
+```
+
+### Kibana:
+
+Acceder a: [http://localhost:5601](http://localhost:5601)
+
+### Mongo Express:
+
+Acceder a: [http://localhost:8081](http://localhost:8081)
 
 ---
 
-## Link del video
+## Cambiar motor de base de datos
 
-- https://youtu.be/tp7VEFcRYfs
+Editar `DB_ENGINE` en `app1` y `app2`:
+
+```yaml
+- DB_ENGINE=postgres
+# o
+- DB_ENGINE=mongodb
+```
+
+---
+
+## Endpoints principales
+
+### API REST (vía Nginx - puerto 3000)
+
+* `POST /auth/register`
+* `POST /auth/login`
+* `GET /users/me`
+* `GET /restaurants`
+* `POST /menus`
+* etc.
+
+### Servicio de búsqueda (puerto 4000)
+
+* `GET /search/products?q=texto`
+* `GET /search/products/category/:categoria`
+* `POST /search/reindex`
+
+---
+
+## Pruebas automatizadas
+
+```bash
+docker exec -it app1 npm test
+```
+
+---
+
+## Video demostrativo
+
+[https://www.youtube.com/watch?v=r_2bHr9QAn8](https://www.youtube.com/watch?v=r_2bHr9QAn8)
+
